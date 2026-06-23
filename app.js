@@ -112,12 +112,53 @@ L.tileLayer(
   'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
   { attribution: 'Tiles &copy; Esri', maxZoom: 19, maxNativeZoom: 17 }
 ).addTo(kmlMap);
-const mapTalhoesLayer = L.layerGroup().addTo(kmlMap);
+// ordem de adicao define a camada visual: quem entra depois fica por cima.
+// linhas primeiro, depois talhao (poligono + numero) pra ele sempre prevalecer.
 const mapLinesLayer = L.layerGroup().addTo(kmlMap);
+const mapLineLabels = L.layerGroup();
+const mapTalhoesLayer = L.layerGroup().addTo(kmlMap);
+
+const LINE_LABEL_MIN_ZOOM = 16;
+
+function updateLineLabelsVisibility() {
+  const shouldShow = kmlMap.getZoom() >= LINE_LABEL_MIN_ZOOM;
+  const isShown = kmlMap.hasLayer(mapLineLabels);
+  if (shouldShow && !isShown) mapLineLabels.addTo(kmlMap);
+  if (!shouldShow && isShown) kmlMap.removeLayer(mapLineLabels);
+}
+
+kmlMap.on('zoomend', updateLineLabelsVisibility);
 
 function renderMap() {
   mapTalhoesLayer.clearLayers();
   mapLinesLayer.clearLayers();
+  mapLineLabels.clearLayers();
+
+  // desenha as linhas primeiro: quem e' inserido depois no renderer compartilhado
+  // do Leaflet fica visualmente por cima, independente do LayerGroup logico
+  for (const layerObj of layers) {
+    for (const line of layerObj.lines) {
+      if (!line.considerar) continue;
+      const color = line.color ? line.color.hex : '#ff6b00';
+      for (const points of line.geometries) {
+        const latlngs = points.map((p) => [p.lat, p.lon]);
+        L.polyline(latlngs, { color, weight: 3 }).addTo(mapLinesLayer);
+
+        const lineFeature = turf.lineString(points.map((p) => [p.lon, p.lat]));
+        const totalLen = turf.length(lineFeature, { units: 'meters' });
+        const mid = turf.along(lineFeature, totalLen / 2, { units: 'meters' });
+        const [midLon, midLat] = mid.geometry.coordinates;
+        L.marker([midLat, midLon], {
+          icon: L.divIcon({
+            className: 'line-label-wrapper',
+            html: `<span class="line-label">${escapeHtml(line.name)}</span>`,
+            iconSize: [0, 0],
+          }),
+          interactive: false,
+        }).addTo(mapLineLabels);
+      }
+    }
+  }
 
   for (const t of talhoes) {
     const key = t.layerCode || String(t.talhao);
@@ -141,32 +182,7 @@ function renderMap() {
     }).addTo(mapTalhoesLayer);
   }
 
-  for (const layerObj of layers) {
-    for (const line of layerObj.lines) {
-      const baseColor = line.color ? line.color.hex : '#ff6b00';
-      const color = line.considerar ? baseColor : 'rgba(120, 120, 120, 0.55)';
-      const weight = line.considerar ? 3 : 1.5;
-      for (const points of line.geometries) {
-        const latlngs = points.map((p) => [p.lat, p.lon]);
-        L.polyline(latlngs, { color, weight }).addTo(mapLinesLayer);
-
-        if (line.considerar) {
-          const lineFeature = turf.lineString(points.map((p) => [p.lon, p.lat]));
-          const totalLen = turf.length(lineFeature, { units: 'meters' });
-          const mid = turf.along(lineFeature, totalLen / 2, { units: 'meters' });
-          const [midLon, midLat] = mid.geometry.coordinates;
-          L.marker([midLat, midLon], {
-            icon: L.divIcon({
-              className: 'line-label-wrapper',
-              html: `<span class="line-label">${escapeHtml(line.name)}</span>`,
-              iconSize: [0, 0],
-            }),
-            interactive: false,
-          }).addTo(mapLinesLayer);
-        }
-      }
-    }
-  }
+  updateLineLabelsVisibility();
 
   const combined = [];
   mapTalhoesLayer.eachLayer((l) => combined.push(l));

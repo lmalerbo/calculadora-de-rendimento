@@ -469,6 +469,11 @@ h2 {
   color: var(--color-primary);
 }
 
+.table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -478,6 +483,7 @@ th, td {
   text-align: left;
   padding: 10px 12px;
   border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
 }
 
 th {
@@ -486,6 +492,7 @@ th {
   color: var(--color-primary);
   text-transform: uppercase;
   letter-spacing: 0.03em;
+  white-space: nowrap;
 }
 
 td.num {
@@ -509,7 +516,6 @@ tr.layer-disabled td {
   display: flex;
   align-items: center;
   gap: 8px;
-  max-width: 480px;
   padding: 3px 0;
 }
 
@@ -538,6 +544,7 @@ tr.layer-disabled td {
   display: flex;
   align-items: center;
   gap: 8px;
+  white-space: nowrap;
 }
 
 #nivelTable th,

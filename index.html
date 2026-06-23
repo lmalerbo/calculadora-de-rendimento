@@ -37,16 +37,18 @@
     <details class="menu-category">
       <summary>Editar variáveis</summary>
       <div class="menu-category__body">
-        <table class="config-table">
-          <thead>
-            <tr>
-              <th>Variável</th>
-              <th>m/h</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="variaveisConfigBody"></tbody>
-        </table>
+        <div class="table-scroll">
+          <table class="config-table">
+            <thead>
+              <tr>
+                <th>Variável</th>
+                <th>m/h</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="variaveisConfigBody"></tbody>
+          </table>
+        </div>
       </div>
     </details>
   </aside>
@@ -73,16 +75,18 @@
     <section id="variavelSection" class="card-section" hidden>
       <h2>Variável de cálculo por talhão</h2>
       <p class="hint">selecione a variável usada em cada talhão/camada</p>
-      <table id="variavelTable">
-        <thead>
-          <tr>
-            <th>Talhão</th>
-            <th>Camada</th>
-            <th>Variável</th>
-          </tr>
-        </thead>
-        <tbody id="variavelBody"></tbody>
-      </table>
+      <div class="table-scroll">
+        <table id="variavelTable">
+          <thead>
+            <tr>
+              <th>Talhão</th>
+              <th>Camada</th>
+              <th>Variável</th>
+            </tr>
+          </thead>
+          <tbody id="variavelBody"></tbody>
+        </table>
+      </div>
     </section>
 
     <p id="errorMsg" class="error" hidden></p>
@@ -97,75 +101,83 @@
       </div>
 
       <h2>Camadas encontradas</h2>
-      <table id="layersTable">
-        <thead>
-          <tr>
-            <th>Considerar</th>
-            <th>Camada</th>
-            <th>Qtd. linhas</th>
-            <th>Soma (m)</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="layersBody"></tbody>
-      </table>
+      <div class="table-scroll">
+        <table id="layersTable">
+          <thead>
+            <tr>
+              <th>Considerar</th>
+              <th>Camada</th>
+              <th>Qtd. linhas</th>
+              <th>Soma (m)</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="layersBody"></tbody>
+        </table>
+      </div>
     </section>
 
     <section id="talhoesSection" class="card-section" hidden>
       <h2>Metros lineares por talhão</h2>
       <p class="hint" id="talhoesHint"></p>
-      <table id="talhoesTable">
-        <thead>
-          <tr>
-            <th>Talhão</th>
-            <th>Área (ha)</th>
-            <th>Camada</th>
-            <th>Metros lineares</th>
-          </tr>
-        </thead>
-        <tbody id="talhoesBody"></tbody>
-      </table>
+      <div class="table-scroll">
+        <table id="talhoesTable">
+          <thead>
+            <tr>
+              <th>Talhão</th>
+              <th>Área (ha)</th>
+              <th>Camada</th>
+              <th>Metros lineares</th>
+            </tr>
+          </thead>
+          <tbody id="talhoesBody"></tbody>
+        </table>
+      </div>
     </section>
 
     <section id="nivelSection" class="card-section" hidden>
       <h2>Nível de custo por talhão</h2>
       <p class="hint">h = metros lineares / taxa (m/h) · h/ha = h / área · nível pela tabela de níveis</p>
-      <table id="nivelTable">
-        <thead>
-          <tr>
-            <th>Talhão</th>
-            <th>Camada</th>
-            <th>Variável</th>
-            <th>Metros</th>
-            <th>Horas</th>
-            <th>h/ha</th>
-            <th>Nível</th>
-            <th>R$/ha</th>
-            <th>Custo total</th>
-          </tr>
-        </thead>
-        <tbody id="nivelBody"></tbody>
-      </table>
+      <div class="table-scroll">
+        <table id="nivelTable">
+          <thead>
+            <tr>
+              <th>Talhão</th>
+              <th>Camada</th>
+              <th>Variável</th>
+              <th>Metros</th>
+              <th>Horas</th>
+              <th>h/ha</th>
+              <th>Nível</th>
+              <th>R$/ha</th>
+              <th>Custo total</th>
+            </tr>
+          </thead>
+          <tbody id="nivelBody"></tbody>
+        </table>
+      </div>
     </section>
 
     <section id="resumoSection" class="card-section" hidden>
       <h2>Cálculo geral da fazenda</h2>
       <p class="hint">soma e média ponderada por área · custo sem nível = R$ 927,67/ha (taxa fixa)</p>
-      <table id="resumoTable">
-        <thead>
-          <tr>
-            <th>Talhão</th>
-            <th>Área (ha)</th>
-            <th>Nível</th>
-            <th>R$/ha</th>
-            <th>Custo c/ nível</th>
-            <th>Custo s/ nível</th>
-            <th>Economia</th>
-          </tr>
-        </thead>
-        <tbody id="resumoBody"></tbody>
-        <tfoot id="resumoFoot"></tfoot>
-      </table>
+      <div class="table-scroll">
+        <table id="resumoTable">
+          <thead>
+            <tr>
+              <th>Talhão</th>
+              <th>Área (ha)</th>
+              <th>Nível</th>
+              <th>R$/ha</th>
+              <th>Custo c/ nível</th>
+              <th>Custo s/ nível</th>
+              <th>Economia</th>
+            </tr>
+          </thead>
+          <tbody id="resumoBody"></tbody>
+          <tfoot id="resumoFoot"></tfoot>
+        </table>
+      </div>
 
       <div class="approx-card" id="resumoAproximado">
         <div class="approx-card__label">
