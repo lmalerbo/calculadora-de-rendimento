@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calculadora de Rendimento</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <button type="button" id="menuToggleBtn" class="menu-toggle" aria-label="Abrir menu">
+    <span></span><span></span><span></span>
+  </button>
+
+  <div id="menuOverlay" class="menu-overlay" hidden></div>
+  <aside id="menuDrawer" class="menu-drawer" hidden>
+    <div class="menu-drawer__header">
+      <h2>Configurações</h2>
+      <button type="button" id="menuCloseBtn" class="menu-close" aria-label="Fechar menu">✕</button>
+    </div>
+
+    <details class="menu-category" open>
+      <summary>Editar logo</summary>
+      <div class="menu-category__body">
+        <div class="branding-field">
+          <label for="logoInput">Logo da empresa</label>
+          <input type="file" id="logoInput" accept="image/*">
+          <img id="logoPreview" class="logo-preview" hidden alt="logo da empresa">
+        </div>
+        <div class="branding-field">
+          <label for="companyNameInput">Nome da empresa</label>
+          <input type="text" id="companyNameInput" placeholder="Ex: Usina da Pedra">
+        </div>
+      </div>
+    </details>
+
+    <details class="menu-category">
+      <summary>Editar variáveis</summary>
+      <div class="menu-category__body">
+        <table class="config-table">
+          <thead>
+            <tr>
+              <th>Variável</th>
+              <th>m/h</th>
+            </tr>
+          </thead>
+          <tbody id="variaveisConfigBody"></tbody>
+        </table>
+      </div>
+    </details>
+  </aside>
+
+  <header>
+    <h1>Calculadora de Rendimento</h1>
+    <p class="subtitle">Carregue um arquivo KML para somar as linhas (metros lineares) por camada</p>
+  </header>
+
+  <div class="app-layout">
+  <main class="app-layout__content">
+    <section class="upload-box" id="uploadBox">
+      <input type="file" id="kmlInput" accept=".kml" hidden>
+      <button type="button" id="selectFileBtn">Selecionar arquivo KML</button>
+      <span id="fileName" class="file-name"></span>
+      <p class="hint">ou arraste o arquivo .kml aqui</p>
+    </section>
+
+    <section class="fazenda-box" id="fazendaBox">
+      <label for="fazendaSelect">Fazenda:</label>
+      <select id="fazendaSelect"></select>
+    </section>
+
+    <section id="variavelSection" hidden>
+      <h2>Variável de cálculo por talhão</h2>
+      <p class="hint">selecione a variável usada em cada talhão/camada</p>
+      <table id="variavelTable">
+        <thead>
+          <tr>
+            <th>Talhão</th>
+            <th>Camada</th>
+            <th>Variável</th>
+          </tr>
+        </thead>
+        <tbody id="variavelBody"></tbody>
+      </table>
+    </section>
+
+    <p id="errorMsg" class="error" hidden></p>
+
+    <section id="resultsSection" hidden>
+      <div class="summary">
+        <div>
+          <span>Total considerado:</span>
+          <span id="qtdConsiderada" class="summary-count">0 linhas</span>
+        </div>
+        <strong id="totalConsiderado">0,00 m</strong>
+      </div>
+
+      <h2>Camadas encontradas</h2>
+      <table id="layersTable">
+        <thead>
+          <tr>
+            <th>Considerar</th>
+            <th>Camada</th>
+            <th>Qtd. linhas</th>
+            <th>Soma (m)</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="layersBody"></tbody>
+      </table>
+    </section>
+
+    <section id="talhoesSection" hidden>
+      <h2>Metros lineares por talhão</h2>
+      <p class="hint" id="talhoesHint"></p>
+      <table id="talhoesTable">
+        <thead>
+          <tr>
+            <th>Talhão</th>
+            <th>Área (ha)</th>
+            <th>Camada</th>
+            <th>Metros lineares</th>
+          </tr>
+        </thead>
+        <tbody id="talhoesBody"></tbody>
+      </table>
+    </section>
+
+    <section id="nivelSection" hidden>
+      <h2>Nível de custo por talhão</h2>
+      <p class="hint">h = metros lineares / taxa (m/h) · h/ha = h / área · nível pela tabela de níveis</p>
+      <table id="nivelTable">
+        <thead>
+          <tr>
+            <th>Talhão</th>
+            <th>Camada</th>
+            <th>Variável</th>
+            <th>Metros</th>
+            <th>Horas</th>
+            <th>h/ha</th>
+            <th>Nível</th>
+            <th>R$/ha</th>
+            <th>Custo total</th>
+          </tr>
+        </thead>
+        <tbody id="nivelBody"></tbody>
+      </table>
+    </section>
+
+    <section id="resumoSection" hidden>
+      <h2>Cálculo geral da fazenda</h2>
+      <p class="hint">soma e média ponderada por área · custo sem nível = R$ 927,67/ha (taxa fixa)</p>
+      <table id="resumoTable">
+        <thead>
+          <tr>
+            <th>Talhão</th>
+            <th>Área (ha)</th>
+            <th>Nível</th>
+            <th>R$/ha</th>
+            <th>Custo c/ nível</th>
+            <th>Custo s/ nível</th>
+            <th>Economia</th>
+          </tr>
+        </thead>
+        <tbody id="resumoBody"></tbody>
+        <tfoot id="resumoFoot"></tfoot>
+      </table>
+
+      <div class="approx-card" id="resumoAproximado">
+        <div class="approx-card__label">
+          <span>Nível aproximado da fazenda</span>
+          <span class="approx-card__hint" id="resumoNivelPonderadoHint"></span>
+        </div>
+
+        <div class="approx-card__body">
+          <div class="approx-card__nivel" id="resumoNivelAprox"></div>
+
+          <div class="approx-card__stats">
+            <div class="approx-stat">
+              <span class="approx-stat__label">R$/ha</span>
+              <span class="approx-stat__value" id="resumoValorHaAprox"></span>
+            </div>
+            <div class="approx-stat">
+              <span class="approx-stat__label">Custo total</span>
+              <span class="approx-stat__value" id="resumoCustoTotalAprox"></span>
+            </div>
+            <div class="approx-stat approx-stat--highlight">
+              <span class="approx-stat__label">Economia projetada</span>
+              <span class="approx-stat__value" id="resumoEconomiaAprox"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button type="button" id="exportBtn" class="export-btn">Exportar orçamento (PDF)</button>
+    </section>
+  </main>
+
+  <aside class="app-layout__map">
+    <div class="map-card">
+      <h2>Visualização do KML</h2>
+      <p class="hint">satélite/terreno (Esri) · talhões da fazenda selecionada em destaque</p>
+      <div id="kmlMap" class="kml-map"></div>
+    </div>
+  </aside>
+  </div>
+
+  <div id="orcamentoPrint"></div>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+  <script src="talhoes-data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
