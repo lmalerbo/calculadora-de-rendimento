@@ -13,6 +13,14 @@ const VARIAVEIS_PADRAO = [
 ];
 
 function loadVariaveis() {
+  try {
+    const stored = JSON.parse(localStorage.getItem('variaveisLista') || 'null');
+    if (Array.isArray(stored) && stored.length > 0) return stored;
+  } catch (err) {
+    // ignora e cai no fallback abaixo
+  }
+
+  // migra edicoes pontuais salvas pela versao anterior (antes de suportar add/excluir)
   let overrides = {};
   try {
     overrides = JSON.parse(localStorage.getItem('variaveisOverrides') || '{}');
@@ -22,15 +30,12 @@ function loadVariaveis() {
   return VARIAVEIS_PADRAO.map((v) => ({ ...v, ...overrides[v.id] }));
 }
 
-function saveVariavelOverride(id, changes) {
-  let overrides = {};
-  try {
-    overrides = JSON.parse(localStorage.getItem('variaveisOverrides') || '{}');
-  } catch (err) {
-    overrides = {};
-  }
-  overrides[id] = { ...overrides[id], ...changes };
-  localStorage.setItem('variaveisOverrides', JSON.stringify(overrides));
+function saveVariaveis() {
+  localStorage.setItem('variaveisLista', JSON.stringify(VARIAVEIS));
+}
+
+function novoVariavelId() {
+  return `custom_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 }
 
 let VARIAVEIS = loadVariaveis();
@@ -39,12 +44,25 @@ const NIVEL_CUSTOS = { 1: 516.84, 2: 852.79, 3: 1213.48, 4: 1705.58 };
 const NIVEL_MAX = 4;
 const NIVEL_ROUND_BREAKPOINT = 0.7;
 
+// faixas de h/ha por talhão: nível 1 (0-2,1) · nível 2 (2,2-3,1) · nível 3 (3,2-4,1) · nível 4 (a partir de 4,2)
+const NIVEL_FAIXAS = [
+  { ateMenosDe: 2.2, nivel: 1 },
+  { ateMenosDe: 3.2, nivel: 2 },
+  { ateMenosDe: 4.2, nivel: 3 },
+  { ateMenosDe: Infinity, nivel: 4 },
+];
+
 function lookupNivel(horaHectare) {
-  const base = Math.floor(horaHectare);
-  const frac = horaHectare - base;
+  const faixa = NIVEL_FAIXAS.find((f) => horaHectare < f.ateMenosDe) || NIVEL_FAIXAS[NIVEL_FAIXAS.length - 1];
+  return { nivel: faixa.nivel, custo: NIVEL_CUSTOS[faixa.nivel] };
+}
+
+// usado só para arredondar a média ponderada dos níveis (nível aproximado da fazenda)
+function roundNivelPonderado(nivelPonderado) {
+  const base = Math.floor(nivelPonderado);
+  const frac = nivelPonderado - base;
   let nivel = frac >= NIVEL_ROUND_BREAKPOINT ? base + 1 : base;
-  nivel = Math.max(1, Math.min(NIVEL_MAX, nivel));
-  return { nivel, custo: NIVEL_CUSTOS[nivel] };
+  return Math.max(1, Math.min(NIVEL_MAX, nivel));
 }
 
 const CUSTO_SEM_NIVEL_HA = 927.67;
@@ -102,8 +120,12 @@ function renderMap() {
   mapLinesLayer.clearLayers();
 
   for (const t of talhoes) {
+    const key = t.layerCode || String(t.talhao);
+    const considerado = isTalhaoConsiderado(key);
     const polyLayer = L.geoJSON(t.feature, {
-      style: { color: '#b8893a', weight: 2, fillOpacity: 0.05 },
+      style: considerado
+        ? { color: '#b8893a', weight: 2, fillOpacity: 0.05 }
+        : { color: '#888', weight: 1, dashArray: '4 4', fillOpacity: 0 },
     });
     polyLayer.addTo(mapTalhoesLayer);
 
@@ -111,7 +133,7 @@ function renderMap() {
     const [lon, lat] = center.geometry.coordinates;
     L.marker([lat, lon], {
       icon: L.divIcon({
-        className: 'talhao-label',
+        className: considerado ? 'talhao-label' : 'talhao-label talhao-label--off',
         html: String(t.talhao),
         iconSize: [28, 16],
       }),
@@ -121,11 +143,27 @@ function renderMap() {
 
   for (const layerObj of layers) {
     for (const line of layerObj.lines) {
-      const color = line.considerar ? '#ff6b00' : 'rgba(120, 120, 120, 0.55)';
+      const baseColor = line.color ? line.color.hex : '#ff6b00';
+      const color = line.considerar ? baseColor : 'rgba(120, 120, 120, 0.55)';
       const weight = line.considerar ? 3 : 1.5;
       for (const points of line.geometries) {
         const latlngs = points.map((p) => [p.lat, p.lon]);
         L.polyline(latlngs, { color, weight }).addTo(mapLinesLayer);
+
+        if (line.considerar) {
+          const lineFeature = turf.lineString(points.map((p) => [p.lon, p.lat]));
+          const totalLen = turf.length(lineFeature, { units: 'meters' });
+          const mid = turf.along(lineFeature, totalLen / 2, { units: 'meters' });
+          const [midLon, midLat] = mid.geometry.coordinates;
+          L.marker([midLat, midLon], {
+            icon: L.divIcon({
+              className: 'line-label-wrapper',
+              html: `<span class="line-label">${escapeHtml(line.name)}</span>`,
+              iconSize: [0, 0],
+            }),
+            interactive: false,
+          }).addTo(mapLinesLayer);
+        }
       }
     }
   }
@@ -151,6 +189,11 @@ let talhoes = [];
 let companyLogoDataUrl = localStorage.getItem('companyLogo') || '';
 let companyNameValue = localStorage.getItem('companyName') || '';
 const variavelSelections = new Map();
+const talhaoConsiderar = new Map();
+
+function isTalhaoConsiderado(talhaoKey) {
+  return talhaoConsiderar.get(talhaoKey) !== false;
+}
 
 if (companyLogoDataUrl) {
   logoPreview.src = companyLogoDataUrl;
@@ -211,7 +254,7 @@ function renderVariaveisConfig() {
       const novoNome = nomeInput.value.trim();
       variavel.nome = novoNome || variavel.nome;
       nomeInput.value = variavel.nome;
-      saveVariavelOverride(variavel.id, { nome: variavel.nome });
+      saveVariaveis();
       refreshAfterVariavelEdit();
     });
     nomeCell.appendChild(nomeInput);
@@ -227,14 +270,55 @@ function renderVariaveisConfig() {
       const parsed = taxaInput.value === '' ? null : Number(taxaInput.value);
       variavel.taxaMH = Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
       taxaInput.value = variavel.taxaMH != null ? variavel.taxaMH : '';
-      saveVariavelOverride(variavel.id, { taxaMH: variavel.taxaMH });
+      saveVariaveis();
       refreshAfterVariavelEdit();
     });
     taxaCell.appendChild(taxaInput);
 
-    row.append(nomeCell, taxaCell);
+    const deleteCell = document.createElement('td');
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'config-delete-btn';
+    deleteBtn.textContent = '✕';
+    deleteBtn.title = 'Excluir variável';
+    deleteBtn.addEventListener('click', () => {
+      const ok = window.confirm(
+        `Excluir "${variavel.nome}"? Talhões/linhas que já usam essa variável ficarão sem variável definida.`
+      );
+      if (!ok) return;
+      VARIAVEIS = VARIAVEIS.filter((v) => v.id !== variavel.id);
+      saveVariaveis();
+      renderVariaveisConfig();
+      refreshAfterVariavelEdit();
+    });
+    deleteCell.appendChild(deleteBtn);
+
+    row.append(nomeCell, taxaCell, deleteCell);
     variaveisConfigBody.appendChild(row);
   }
+
+  const addRow = document.createElement('tr');
+  const addCell = document.createElement('td');
+  addCell.colSpan = 3;
+  const addBtn = document.createElement('button');
+  addBtn.type = 'button';
+  addBtn.className = 'config-add-btn';
+  addBtn.textContent = '+ Adicionar variável';
+  addBtn.addEventListener('click', () => {
+    VARIAVEIS.push({ id: novoVariavelId(), nome: 'NOVA VARIÁVEL', taxaMH: null });
+    saveVariaveis();
+    renderVariaveisConfig();
+    refreshAfterVariavelEdit();
+    const inputs = variaveisConfigBody.querySelectorAll('input[type="text"]');
+    const lastInput = inputs[inputs.length - 1];
+    if (lastInput) {
+      lastInput.focus();
+      lastInput.select();
+    }
+  });
+  addCell.appendChild(addBtn);
+  addRow.appendChild(addCell);
+  variaveisConfigBody.appendChild(addRow);
 }
 
 function refreshAfterVariavelEdit() {
@@ -472,6 +556,8 @@ function parseKML(xmlText) {
   const docNameEl = directChild(root, 'name');
   kmlDocumentName = docNameEl ? docNameEl.textContent.trim() : '';
   const found = [];
+  const styleMap = buildKmlStyleMap(doc);
+  const linhasSemCor = [];
 
   function walk(parentEl, pathPrefix) {
     for (const child of Array.from(parentEl.children)) {
@@ -484,9 +570,13 @@ function parseKML(xmlText) {
       const isDefaultConsiderado = DEFAULT_CONSIDERAR.includes(fullPath);
       const lines = Array.from(child.children)
         .filter((c) => c.tagName === 'Placemark')
-        .map(placemarkToLine)
+        .map((pm) => placemarkToLine(pm, styleMap))
         .filter((line) => line && line.length > 0)
         .map((line) => ({ ...line, considerar: isDefaultConsiderado }));
+
+      for (const line of lines) {
+        if (!line.color) linhasSemCor.push(`${fullPath} > ${line.name}`);
+      }
 
       if (lines.length > 0) {
         found.push({ name: fullPath, lines });
@@ -497,14 +587,67 @@ function parseKML(xmlText) {
   }
 
   walk(root, '');
+
+  if (linhasSemCor.length > 0) {
+    console.warn(
+      `Não foi possível identificar a cor original no KML para ${linhasSemCor.length} linha(s) (vão usar a cor padrão):`,
+      linhasSemCor
+    );
+  }
+
   return found;
+}
+
+function buildKmlStyleMap(doc) {
+  const map = new Map();
+  for (const styleEl of doc.getElementsByTagName('Style')) {
+    const id = styleEl.getAttribute('id');
+    if (!id) continue;
+    const lineStyle = directChild(styleEl, 'LineStyle');
+    const colorEl = lineStyle ? directChild(lineStyle, 'color') : null;
+    if (colorEl && colorEl.textContent.trim()) {
+      map.set(id, colorEl.textContent.trim());
+    }
+  }
+  return map;
+}
+
+function parseKmlColor(hexStr) {
+  if (!hexStr || hexStr.length < 8) return null;
+  const clean = hexStr.trim();
+  const aa = clean.slice(0, 2);
+  const bb = clean.slice(2, 4);
+  const gg = clean.slice(4, 6);
+  const rr = clean.slice(6, 8);
+  const alpha = parseInt(aa, 16) / 255;
+  const hex = `#${rr}${gg}${bb}`;
+  if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return null;
+  return { hex, alpha: Number.isFinite(alpha) ? alpha : 1 };
+}
+
+function getPlacemarkLineColor(placemark, styleMap) {
+  const inlineStyle = directChild(placemark, 'Style');
+  const inlineLineStyle = inlineStyle ? directChild(inlineStyle, 'LineStyle') : null;
+  const inlineColorEl = inlineLineStyle ? directChild(inlineLineStyle, 'color') : null;
+  if (inlineColorEl && inlineColorEl.textContent.trim()) {
+    return parseKmlColor(inlineColorEl.textContent.trim());
+  }
+
+  const styleUrlEl = directChild(placemark, 'styleUrl');
+  if (styleUrlEl && styleUrlEl.textContent.trim()) {
+    const id = styleUrlEl.textContent.trim().split('#').pop();
+    const colorHex = styleMap.get(id);
+    if (colorHex) return parseKmlColor(colorHex);
+  }
+
+  return null;
 }
 
 function directChild(el, tagName) {
   return Array.from(el.children).find((c) => c.tagName === tagName) || null;
 }
 
-function placemarkToLine(placemark) {
+function placemarkToLine(placemark, styleMap) {
   const lineStrings = placemark.getElementsByTagName('LineString');
   let totalLength = 0;
   const geometries = [];
@@ -520,7 +663,8 @@ function placemarkToLine(placemark) {
 
   const nameEl = directChild(placemark, 'name');
   const name = nameEl ? nameEl.textContent.trim() : placemark.getAttribute('id') || '(sem nome)';
-  return { name, length: totalLength, geometries };
+  const color = getPlacemarkLineColor(placemark, styleMap);
+  return { name, length: totalLength, geometries, color };
 }
 
 function parseCoordinates(text) {
@@ -747,21 +891,22 @@ function renderTalhoes() {
   }
 
   const breakdown = computeTalhaoBreakdown();
-  const sortedKeys = Array.from(breakdown.keys()).sort((a, b) =>
+  const allSortedKeys = Array.from(breakdown.keys()).sort((a, b) =>
     a.localeCompare(b, 'pt-BR', { numeric: true })
   );
+  const consideredKeys = allSortedKeys.filter(isTalhaoConsiderado);
 
-  renderTalhoesTable(breakdown, sortedKeys);
-  renderVariavelTable(breakdown, sortedKeys);
-  renderNivelTable(breakdown, sortedKeys);
-  renderResumoFazenda(breakdown, sortedKeys);
+  renderVariavelTable(breakdown, allSortedKeys);
+  renderTalhoesTable(breakdown, consideredKeys);
+  renderNivelTable(breakdown, consideredKeys);
+  renderResumoFazenda(breakdown, consideredKeys);
 }
 
 function getRefreshedBreakdown() {
   const breakdown = computeTalhaoBreakdown();
-  const sortedKeys = Array.from(breakdown.keys()).sort((a, b) =>
-    a.localeCompare(b, 'pt-BR', { numeric: true })
-  );
+  const sortedKeys = Array.from(breakdown.keys())
+    .filter(isTalhaoConsiderado)
+    .sort((a, b) => a.localeCompare(b, 'pt-BR', { numeric: true }));
   return { breakdown, sortedKeys };
 }
 
@@ -837,14 +982,29 @@ function renderVariavelTable(breakdown, sortedKeys) {
   for (const key of sortedKeys) {
     const entry = breakdown.get(key);
     const layerNames = Array.from(entry.byLayer.keys()).sort((a, b) => a.localeCompare(b, 'pt-BR'));
-    const talhaoLabel = `Talhão ${entry.talhao.talhao}`;
+    const considerado = isTalhaoConsiderado(key);
 
     layerNames.forEach((layerName, i) => {
       const row = document.createElement('tr');
+      row.classList.toggle('layer-disabled', !considerado);
       if (i === 0) {
         const talhaoCell = document.createElement('td');
-        talhaoCell.textContent = talhaoLabel;
         talhaoCell.rowSpan = layerNames.length;
+        talhaoCell.className = 'talhao-checkbox-cell';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = considerado;
+        checkbox.title = 'Considerar este talhão no cálculo';
+        checkbox.addEventListener('change', () => {
+          talhaoConsiderar.set(key, checkbox.checked);
+          renderTalhoes();
+        });
+
+        const label = document.createElement('span');
+        label.textContent = entry.talhao.talhao;
+
+        talhaoCell.append(checkbox, label);
         row.append(talhaoCell);
       }
 
@@ -1124,14 +1284,14 @@ function renderResumoFazenda(breakdown, sortedKeys) {
     totalRow.append(c1, c2, c3, c4, c5, c6, c7);
     resumoFoot.appendChild(totalRow);
 
-    const nivelAproxInfo = lookupNivel(nivelPonderado);
-    const nivelAproximado = nivelAproxInfo.nivel;
-    const custoPorNivelAprox = nivelAproxInfo.custo * areaTotal;
+    const nivelAproximado = roundNivelPonderado(nivelPonderado);
+    const custoHaAprox = NIVEL_CUSTOS[nivelAproximado];
+    const custoPorNivelAprox = custoHaAprox * areaTotal;
     const economiaAprox = custoSemNivelTotal - custoPorNivelAprox;
 
     resumoNivelPonderadoHint.textContent = `média ponderada: ${formatNumberPtBR(nivelPonderado)}`;
     resumoNivelAprox.textContent = nivelAproximado;
-    resumoValorHaAprox.textContent = formatReais(nivelAproxInfo.custo);
+    resumoValorHaAprox.textContent = formatReais(custoHaAprox);
     resumoCustoTotalAprox.textContent = formatReais(custoPorNivelAprox);
     resumoEconomiaAprox.textContent = formatReais(economiaAprox);
     resumoAproximado.hidden = false;
