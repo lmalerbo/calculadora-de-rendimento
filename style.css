@@ -454,6 +454,35 @@ h1 {
   margin-top: 0;
 }
 
+#variavelTable {
+  table-layout: fixed;
+}
+
+#variavelTable .col-talhao {
+  width: 110px;
+}
+
+#variavelTable .col-camada {
+  width: 46%;
+}
+
+#variavelTable summary {
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#variavelTable .camada-name {
+  font-weight: 600;
+}
+
+#variavelTable .camada-meta {
+  margin-left: 6px;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
 #variavelTable select {
   width: 100%;
   padding: 6px 8px;

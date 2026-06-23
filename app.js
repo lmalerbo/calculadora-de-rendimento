@@ -1,6 +1,15 @@
 const EARTH_RADIUS_M = 6371000;
 const DEFAULT_CONSIDERAR = ['04_Curvas_Existentes', '05_Base_Largas_Existentes'];
 
+// nomes de exibicao amigaveis para as camadas do KML (a "Camadas encontradas" mantem o nome original)
+const CAMADA_DISPLAY_NAMES = {
+  '04_Curvas_Existentes': 'Embutido',
+  '05_Base_Largas_Existentes': 'Base Larga',
+};
+function getCamadaDisplayName(name) {
+  return CAMADA_DISPLAY_NAMES[name] || name;
+}
+
 const VARIAVEIS_PADRAO = [
   { id: 'embutido_bom', nome: 'REFORMAR EMBUTIDO BOM', taxaMH: 50 },
   { id: 'embutido_ruim', nome: 'REFORMAR EMBUTIDO RUIM', taxaMH: 35 },
@@ -951,7 +960,7 @@ function renderTalhoesTable(breakdown, sortedKeys) {
         row.append(talhaoCell, areaCell);
       }
       const layerCell = document.createElement('td');
-      layerCell.textContent = layerName;
+      layerCell.textContent = getCamadaDisplayName(layerName);
       const metersCell = document.createElement('td');
       metersCell.className = 'num';
       metersCell.textContent = formatMeters(entry.byLayer.get(layerName).total);
@@ -1006,7 +1015,9 @@ function renderVariavelTable(breakdown, sortedKeys) {
       if (i === 0) {
         const talhaoCell = document.createElement('td');
         talhaoCell.rowSpan = layerNames.length;
-        talhaoCell.className = 'talhao-checkbox-cell';
+
+        const checkboxWrap = document.createElement('div');
+        checkboxWrap.className = 'talhao-checkbox-cell';
 
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
@@ -1020,17 +1031,29 @@ function renderVariavelTable(breakdown, sortedKeys) {
         const label = document.createElement('span');
         label.textContent = entry.talhao.talhao;
 
-        talhaoCell.append(checkbox, label);
+        checkboxWrap.append(checkbox, label);
+        talhaoCell.appendChild(checkboxWrap);
         row.append(talhaoCell);
       }
 
       const layerEntry = entry.byLayer.get(layerName);
       const layerKey = `${key}::${layerName}`;
+      const displayName = getCamadaDisplayName(layerName);
 
       const layerCell = document.createElement('td');
       const details = document.createElement('details');
       const summary = document.createElement('summary');
-      summary.textContent = `${layerName} (${layerEntry.lines.size} linha${layerEntry.lines.size === 1 ? '' : 's'})`;
+
+      const camadaNameSpan = document.createElement('span');
+      camadaNameSpan.className = 'camada-name';
+      camadaNameSpan.textContent = displayName;
+      camadaNameSpan.title = displayName;
+
+      const camadaMetaSpan = document.createElement('span');
+      camadaMetaSpan.className = 'camada-meta';
+      camadaMetaSpan.textContent = `(${layerEntry.lines.size} linha${layerEntry.lines.size === 1 ? '' : 's'})`;
+
+      summary.append(camadaNameSpan, camadaMetaSpan);
       details.appendChild(summary);
 
       const lineList = document.createElement('ul');
@@ -1129,7 +1152,7 @@ function renderNivelTable(breakdown, sortedKeys) {
       }
 
       const layerCell = document.createElement('td');
-      layerCell.textContent = layerName;
+      layerCell.textContent = getCamadaDisplayName(layerName);
 
       const variavelCell = document.createElement('td');
       if (variavelIdsUsados.size === 0) {
