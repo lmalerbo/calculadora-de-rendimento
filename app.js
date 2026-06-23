@@ -110,7 +110,7 @@ const variaveisConfigBody = document.getElementById('variaveisConfigBody');
 const kmlMap = L.map('kmlMap', { zoomControl: true }).setView([-14.2, -51.9], 4);
 L.tileLayer(
   'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-  { attribution: 'Tiles &copy; Esri', maxZoom: 19 }
+  { attribution: 'Tiles &copy; Esri', maxZoom: 19, maxNativeZoom: 17 }
 ).addTo(kmlMap);
 const mapTalhoesLayer = L.layerGroup().addTo(kmlMap);
 const mapLinesLayer = L.layerGroup().addTo(kmlMap);
